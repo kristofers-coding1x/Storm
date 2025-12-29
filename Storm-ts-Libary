@@ -1,3 +1,7 @@
+-- =====================================================
+-- ==                  STORM LIBRARY                  ==
+-- == (Provided by you - pasted in full here)        ==
+-- =====================================================
 
 local Storm = {
     Registry = {};
@@ -3354,3 +3358,313 @@ Players.PlayerRemoving:Connect(OnPlayerChange)
 
 getgenv().Storm = Storm
 return Storm
+
+
+-- =====================================================
+-- ==              MAIN SCRIPT START                  ==
+-- =====================================================
+
+-- Create the UI Window using the Storm library
+local Library = Storm -- The library is now a local variable, not loaded from a URL
+local Window = Library:CreateWindow({
+    Title = 'Storm',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2,
+})
+
+-- Create Tabs
+local Tabs = {
+    Combat = Window:AddTab('Combat'),
+    Visuals = Window:AddTab('Visuals'),
+    Misc = Window:AddTab('Misc'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+-- Create GroupBoxes for each tab
+local CombatLeftGroupBox = Tabs.Combat:AddLeftGroupbox('Silent Aim')
+local CombatRightGroupBox = Tabs.Combat:AddRightGroupbox('Hitbox Expander')
+local VisualsLeftGroupBox = Tabs.Visuals:AddLeftGroupbox('ESP')
+local VisualsRightGroupBox = Tabs.Visuals:AddRightGroupbox('Other ESP')
+local MiscLeftGroupBox = Tabs.Misc:AddLeftGroupbox('Exploit')
+local MiscRightGroupBox = Tabs.Misc:AddRightGroupbox('Player')
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+-- Add UI Settings elements
+MenuGroup:AddButton('Unload', function() Library:Unload() end)
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = false, Text = 'Menu keybind' })
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- =====================================================
+-- ==          SILENT AIM - Trident Survival          ==
+-- =====================================================
+
+-- =====================================================
+-- ==              CORE CONFIGURATION                 ==
+-- =====================================================
+
+-- This table holds all the settings for the silent aim feature.
+local silent_aim_config = {
+    enabled = false,             -- Master toggle for silent aim
+    draw_fov = false,            -- Toggle to draw the FOV circle
+    fov_radius = 100,            -- The radius of the FOV circle in pixels
+    fov_color = Color3.fromRGB(255, 255, 255), -- Color of the FOV circle
+    draw_snapline = false,       -- Toggle to draw the snapline
+    snapline_color = Color3.fromRGB(255, 0, 0), -- Color of the snapline
+}
+
+-- =====================================================
+-- ==              REQUIRED SERVICES & OBJECTS         ==
+-- =====================================================
+
+-- Using cloneref to prevent anti-cheat detection
+local cloneref = cloneref or function(ref) return ref end
+local RunService = cloneref(game:GetService("RunService"))
+local Workspace = cloneref(game:GetService("Workspace"))
+local Players = cloneref(game:GetService("Players"))
+
+-- Core game objects and classes
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Classes = getrenv()._G.classes
+local Camera_client = Classes.Camera
+local Fps_client = Classes.FPS
+
+-- Store the original GetCFrame function so we can call it when silent aim is off
+local old_get_cframe = Camera_client.GetCFrame
+
+-- =====================================================
+-- ==              WEAPON DATABASE                    ==
+-- =====================================================
+
+-- A list of all valid guns that silent aim will work with.
+local validGuns = {
+    AR15=true, C9=true, Crossbow=true, Bow=true, EnergyRifle=true,
+    GaussRifle=true, HMAR=true, KABAR=true, LeverActionRifle=true,
+    M4A1=true, PipePistol=true, PipeSMG=true, PumpShotgun=true,
+    SCAR=true, SVD=true, USP9=true, UZI=true, Blunderbuss=true
+}
+
+-- Projectile stats for each weapon. [Speed, Drop]
+-- These values are used for predicting bullet trajectory.
+local oldGunValues = {
+    USP9              = {ProjectileSpeed = 600,  ProjectileDrop = 3},
+    Bow               = {ProjectileSpeed = 300,  ProjectileDrop = 3},
+    C9                = {ProjectileSpeed = 600,  ProjectileDrop = 3},
+    SVD               = {ProjectileSpeed = 2000, ProjectileDrop = 1.1},
+    GaussRifle        = {ProjectileSpeed = 3000, ProjectileDrop = 2},
+    UZI               = {ProjectileSpeed = 1000, ProjectileDrop = 3.5},
+    LeverActionRifle  = {ProjectileSpeed = 1200, ProjectileDrop = 1.5},
+    M4A1              = {ProjectileSpeed = 1300, ProjectileDrop = 4},
+    PipePistol        = {ProjectileSpeed = 500,  ProjectileDrop = 3},
+    PipeSMG           = {ProjectileSpeed = 600,  ProjectileDrop = 3},
+    PumpShotgun       = {ProjectileSpeed = 600,  ProjectileDrop = 2},
+    Blunderbuss       = {ProjectileSpeed = 700,  ProjectileDrop = 3},
+    SCAR              = {ProjectileSpeed = 1400, ProjectileDrop = 2},
+    HMAR              = {ProjectileSpeed = 600,  ProjectileDrop = 3},
+    AR15              = {ProjectileSpeed = 1300, ProjectileDrop = 4},
+    EnergyRifle       = {ProjectileSpeed = 1400, ProjectileDrop = 2},
+    Crossbow          = {ProjectileSpeed = 600,  ProjectileDrop = 3}
+}
+
+-- Helper function to check if an item is a valid gun
+local function IsGun(Gun)
+    return validGuns[tostring(Gun)]
+end
+
+-- =====================================================
+-- ==          CORE SILENT AIM LOGIC                  ==
+-- =====================================================
+
+-- Finds the closest player to the center of your screen within the FOV radius
+local function GetClosestTarget(maxDistance)
+    local closestTarget, targetVelocity, closestDistance = nil, nil, math.huge
+    -- Iterate through all players in the game's entity map
+    for i, v in next, Classes.Player.EntityMap do
+        -- Check if the target is a valid, non-sleeping player
+        if v.type=="Player" and not v.sleeping and v.model:FindFirstChild("HumanoidRootPart") and v.model:FindFirstChild("Head") then
+            
+            local distanceToPlayer = (v.model.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
+            local screenPoint = Camera:WorldToViewportPoint(v.model.Head.Position)
+            local centerScreen = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+            local distanceFromCenter = (Vector2.new(screenPoint.X, screenPoint.Y) - centerScreen).Magnitude
+            
+            -- If the player is within range, inside our FOV, and closer than the last one...
+            if distanceToPlayer <= maxDistance and distanceFromCenter <= silent_aim_config.fov_radius and distanceToPlayer < closestDistance then
+                closestTarget = v.model
+                targetVelocity = v.velocityVector
+                closestDistance = distanceToPlayer
+            end
+        end
+    end
+    return closestTarget, targetVelocity
+end
+
+-- Calculates the predicted position of a moving target, accounting for bullet drop
+local function CalculateBulletDrop(tPos, tVel, cPos, pSpeed, pDrop)
+    -- tPos: Target Position, tVel: Target Velocity, cPos: Camera Position
+    -- pSpeed: Projectile Speed, pDrop: Projectile Drop
+    
+    local dTT = (tPos - cPos).Magnitude -- Distance to target
+    local tTT = dTT / pSpeed            -- Time for projectile to reach target
+    
+    -- Predict target's future movement
+    local horizontalVel = Vector3.new(tVel.X,0,tVel.Z) * 7
+    local verticalVel = Vector3.new(0,tVel.Y,0) * 2
+    local adjustedVel = horizontalVel + verticalVel
+    local predictedTargetPos = tPos + (adjustedVel * tTT)
+    
+    -- Calculate how much the bullet will drop over that time
+    local dropAmount = -pDrop ^ (tTT * pDrop) + 1
+    
+    -- Return the final aim point, adjusted for drop
+    return predictedTargetPos - Vector3.new(0, dropAmount, 0)
+end
+
+-- =====================================================
+-- ==          THE MAIN CAMERA HOOK                   ==
+-- =====================================================
+
+-- This is where the magic happens. We replace the game's camera function.
+Camera_client.GetCFrame = function()
+    -- 1. Find the best target
+    local closest, velocityVector = GetClosestTarget(1000)
+    local equippedData = Fps_client.GetEquippedItem()
+
+    -- 2. Check all conditions: Is silent aim on? Do we have a target? Is it a valid player? Are we holding a gun?
+    if silent_aim_config.enabled and equippedData and closest and closest:FindFirstChild("HumanoidRootPart") and closest:FindFirstChild("Head") and IsGun(equippedData.type) then
+        
+        -- 3. Get the weapon's stats
+        local itemClass = Classes[equippedData.type] or oldGunValues[equippedData.type]
+        if itemClass then
+            local projectileSpeed = itemClass.ProjectileSpeed or 500
+            local projectileDrop = itemClass.ProjectileDrop or 0.1
+            
+            -- 4. Calculate the perfect aim point
+            local headTop = closest.Head.Position + Vector3.new(0, closest.Head.Size.Y/2, 0)
+            local predictedPosition = CalculateBulletDrop(
+                headTop,
+                velocityVector or Vector3.new(0,0,0),
+                Camera.CFrame.Position,
+                projectileSpeed,
+                projectileDrop
+            )
+            
+            -- 5. Return a new CFrame that looks at the predicted position.
+            -- The game will use this faked camera direction to fire the projectile.
+            return CFrame.new(Camera.CFrame.Position, predictedPosition)
+        end
+    end
+    
+    -- If silent aim is off or conditions aren't met, return the normal camera view
+    return old_get_cframe()
+end
+
+-- =====================================================
+-- ==            VISUALS (FOV & SNAPLINE)            ==
+-- =====================================================
+
+local fovCircle
+local snapLine
+
+-- This loop runs every frame to draw and update the visuals
+RunService.RenderStepped:Connect(function()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    -- --- FOV Circle Logic ---
+    if silent_aim_config.draw_fov then
+        if not fovCircle then
+            fovCircle = Drawing.new("Circle")
+            fovCircle.Thickness = 1
+            fovCircle.Filled = false
+        end
+        fovCircle.Radius = silent_aim_config.fov_radius
+        fovCircle.Position = center
+        fovCircle.Color = silent_aim_config.fov_color
+        fovCircle.Visible = true
+    elseif fovCircle then
+        fovCircle.Visible = false
+    end
+
+    -- --- Snapline Logic ---
+    local closest, _ = GetClosestTarget(1000) -- Re-find the target for the line
+
+    if silent_aim_config.draw_snapline and closest and closest:FindFirstChild("Head") then
+        if not snapLine then
+            snapLine = Drawing.new("Line")
+            snapLine.Thickness = 1
+        end
+        local headPos = Camera:WorldToViewportPoint(closest.Head.Position)
+        snapLine.From = center
+        snapLine.To = Vector2.new(headPos.X, headPos.Y)
+        snapLine.Color = silent_aim_config.snapline_color
+        snapLine.Visible = true
+    elseif snapLine then
+        snapLine.Visible = false
+    end
+end)
+
+
+-- =====================================================
+-- ==              USER INTERFACE (UI)                ==
+-- =====================================================
+
+-- == UI ELEMENTS ==
+
+-- Main Toggle
+CombatLeftGroupBox:AddToggle('SilentAimToggle', {
+    Text = 'Enable Silent Aim',
+    Default = silent_aim_config.enabled,
+    Callback = function(Value)
+        silent_aim_config.enabled = Value
+    end
+})
+
+-- FOV Controls
+CombatLeftGroupBox:AddToggle('DrawFOVToggle', {
+    Text = 'Draw FOV',
+    Default = silent_aim_config.draw_fov,
+    Callback = function(Value)
+        silent_aim_config.draw_fov = Value
+    end
+})
+
+CombatLeftGroupBox:AddSlider('FOVRadiusSlider', {
+    Text = 'FOV Radius',
+    Default = silent_aim_config.fov_radius,
+    Min = 50,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        silent_aim_config.fov_radius = Value
+    end
+})
+
+local FOVColorPicker = CombatLeftGroupBox:AddLabel('FOV Color'):AddColorPicker('FOVColorPicker', {
+    Default = silent_aim_config.fov_color,
+    Title = 'FOV Circle Color',
+    Callback = function(Value)
+        silent_aim_config.fov_color = Value
+    end
+})
+
+-- Snapline Controls
+CombatLeftGroupBox:AddToggle('DrawSnaplineToggle', {
+    Text = 'Draw Snapline',
+    Default = silent_aim_config.draw_snapline,
+    Callback = function(Value)
+        silent_aim_config.draw_snapline = Value
+    end
+})
+
+local SnaplineColorPicker = CombatLeftGroupBox:AddLabel('Snapline Color'):AddColorPicker('SnaplineColorPicker', {
+    Default = silent_aim_config.snapline_color,
+    Title = 'Snapline Color',
+    Callback = function(Value)
+        silent_aim_config.snapline_color = Value
+    end
+})
+
+-- Make sure the keybind frame is visible
+Library.KeybindFrame.Visible = true
