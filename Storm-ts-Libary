@@ -1,5 +1,5 @@
 --[[
-    Assign different flags to each element to prevent from configs overriding eachother
+    Assignggg different flags to each element to prevent from configs overriding eachother
     Example script is at the bottom
 
     Documentation:
@@ -3453,6 +3453,12 @@ local Library do
     end
 
     Components.Keybind = function(Data)
+        -- Safety check to prevent errors if Parent is invalid
+        if not Data.Parent or not Data.Parent.Instance then
+            warn("Keybind: Parent or Parent.Instance is nil")
+            return nil, nil
+        end
+
         local Keybind = {
             Toggled = false,
             Key = nil,
@@ -3734,32 +3740,36 @@ local Library do
             Update()
         end
 
-        Items["KeyButton"]:Connect("MouseButton1Click", function()
-            if Keybind.Picking then 
-                return
-            end
-
-            Keybind.Picking = true
-
-            Items["KeyButton"]:ChangeItemTheme({TextColor3 = "Accent"})
-            Items["KeyButton"]:Tween(nil, {TextColor3 = Library.Theme.Accent})
-
-            local InputBegan 
-            InputBegan = UserInputService.InputBegan:Connect(function(Input)
-                if Input.UserInputType == Enum.UserInputType.Keyboard then 
-                    Keybind:Set(Input.KeyCode)
-                else
-                    Keybind:Set(Input.UserInputType)
+        if Items["KeyButton"] then
+            Items["KeyButton"]:Connect("MouseButton1Click", function()
+                if Keybind.Picking then 
+                    return
                 end
 
-                InputBegan:Disconnect()
-                InputBegan = nil
-            end)
-        end)
+                Keybind.Picking = true
 
-        Items["KeyButton"]:Connect("MouseButton2Down", function()
-            Keybind:SetOpen(not Keybind.IsOpen)
-        end)
+                Items["KeyButton"]:ChangeItemTheme({TextColor3 = "Accent"})
+                Items["KeyButton"]:Tween(nil, {TextColor3 = Library.Theme.Accent})
+
+                local InputBegan 
+                InputBegan = UserInputService.InputBegan:Connect(function(Input)
+                    if Input.UserInputType == Enum.UserInputType.Keyboard then 
+                        Keybind:Set(Input.KeyCode)
+                    else
+                        Keybind:Set(Input.UserInputType)
+                    end
+
+                    InputBegan:Disconnect()
+                    InputBegan = nil
+                end)
+            end)
+
+            Items["KeyButton"]:Connect("MouseButton2Down", function()
+                Keybind:SetOpen(not Keybind.IsOpen)
+            end)
+        else
+            warn("KeyButton is nil, cannot connect events")
+        end
 
         Library:Connect(UserInputService.InputBegan, function(Input)
             if tostring(Input.KeyCode) == Keybind.Key or tostring(Input.UserInputType) == Keybind.Key then
@@ -4832,7 +4842,8 @@ local Library do
             Tooltip = Data.Tooltip or Data.tooltip or nil,
 
             Value = false,
-            Count = 0
+            Count = 0,
+            Items = nil -- MODIFIED: Added to store the Items table
         }
 
         local NewToggle, Items = Components.Toggle({
@@ -4844,6 +4855,8 @@ local Library do
             Callback = Toggle.Callback,
             Tooltip = Toggle.Tooltip
         })
+
+        Toggle.Items = Items -- MODIFIED: Store the Items table in the Toggle object
 
         function Toggle:Set(Value)
             NewToggle:Set(Value)
@@ -4878,7 +4891,7 @@ local Library do
 
             local NewColorpicker, ColorpickerItems = Components.Colorpicker({
                 Name = Colorpicker.Name,
-                Parent = Items["Toggle"],
+                Parent = Toggle.Items["Toggle"], -- MODIFIED: Use Toggle.Items instead of Items
                 Flag = Colorpicker.Flag,
                 Default = Colorpicker.Default,
                 Callback = Colorpicker.Callback,
@@ -4920,7 +4933,7 @@ local Library do
 
             local NewKeybind, KeybindItems = Components.Keybind({
                 Name = Keybind.Name,
-                Parent = Items["Toggle"],
+                Parent = Toggle.Items["Toggle"], -- MODIFIED: Use Toggle.Items instead of Items
                 Flag = Keybind.Flag,
                 Default = Keybind.Default,
                 Tooltip = Keybind.Tooltip,
@@ -5109,7 +5122,8 @@ local Library do
             Name = Text or "Label",
             Alignment = Alignment or "Left",
 
-            Count = 0
+            Count = 0,
+            Items = nil -- MODIFIED: Added to store the Items table
         }
         
         local Items = Components.Label({
@@ -5118,8 +5132,10 @@ local Library do
             Alignment = Label.Alignment
         })
 
+        Label.Items = Items -- MODIFIED: Store the Items table in the Label object
+
         function Label:SetVisibility(Bool)
-            Items["Label"].Instance.Visible = Bool
+            Label.Items["Label"].Instance.Visible = Bool -- MODIFIED: Use Label.Items instead of Items
         end
 
         function Label:Colorpicker(Data)
@@ -5143,7 +5159,7 @@ local Library do
 
             local NewColorpicker, ColorpickerItems = Components.Colorpicker({
                 Name = Colorpicker.Name,
-                Parent = Items["Label"],
+                Parent = Label.Items["Label"], -- MODIFIED: Use Label.Items instead of Items
                 Flag = Colorpicker.Flag,
                 Default = Colorpicker.Default,
                 Callback = Colorpicker.Callback,
@@ -5184,7 +5200,7 @@ local Library do
 
             local NewKeybind, KeybindItems = Components.Keybind({
                 Name = Keybind.Name,
-                Parent = Items["Label"],
+                Parent = Label.Items["Label"], -- MODIFIED: Use Label.Items instead of Items
                 Flag = Keybind.Flag,
                 Default = Keybind.Default,
                 Mode = Keybind.Mode,
