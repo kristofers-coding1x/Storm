@@ -378,7 +378,7 @@ local Library do
         }
     }
 
-    Library.Theme = TableClone(Themes["Default"])
+    Library.Theme = TableClone(Themes["Bitchbot"]) -- <<< DEFAULT THEME SET TO "Bitchbot"
     Library.Themes = Themes
 
     local Tween = { } do
@@ -563,18 +563,18 @@ local Library do
             local ResizeMax = Gui.Parent.AbsoluteSize - Gui.AbsoluteSize
 
             local ResizeButton = Instances:Create("TextButton", {
-				Parent = Gui,
-				AnchorPoint = Vector2New(1, 1),
-				BorderColor3 = FromRGB(0, 0, 0),
-				Size = UDim2New(0, 8, 0, 8),
-				Position = UDim2New(1, 0, 1, 0),
+                Parent = Gui,
+                AnchorPoint = Vector2New(1, 1),
+                BorderColor3 = FromRGB(0, 0, 0),
+                Size = UDim2New(0, 8, 0, 8),
+                Position = UDim2New(1, 0, 1, 0),
                 Name = "\0",
-				BorderSizePixel = 0,
-				BackgroundTransparency = 1,
-				AutoButtonColor = false,
+                BorderSizePixel = 0,
+                BackgroundTransparency = 1,
+                AutoButtonColor = false,
                 Visible = true,
                 Text = ""
-			})
+            })
 
             ResizeButton:Connect("InputBegan", function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
@@ -592,12 +592,12 @@ local Library do
 
             Library:Connect(UserInputService.InputChanged, function(Input)
                 if Input.UserInputType == Enum.UserInputType.MouseMovement and Resizing then
-					ResizeMax = Maximum or Gui.Parent.AbsoluteSize - Gui.AbsoluteSize
+                    ResizeMax = Maximum or Gui.Parent.AbsoluteSize - Gui.AbsoluteSize
 
-					Delta = Start + UDim2New(0, Input.Position.X, 0, Input.Position.Y)
-					Delta = UDim2New(0, math.clamp(Delta.X.Offset, Minimum.X, ResizeMax.X), 0, math.clamp(Delta.Y.Offset, Minimum.Y, ResizeMax.Y))
+                    Delta = Start + UDim2New(0, Input.Position.X, 0, Input.Position.Y)
+                    Delta = UDim2New(0, math.clamp(Delta.X.Offset, Minimum.X, ResizeMax.X), 0, math.clamp(Delta.Y.Offset, Minimum.Y, ResizeMax.Y))
 
-					Tween:Create(Gui, TweenInfo.new(0.17, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Delta}, true)
+                    Tween:Create(Gui, TweenInfo.new(0.17, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Delta}, true)
                 end
             end)
 
@@ -3302,7 +3302,7 @@ local Library do
                 OldColor = Colorpicker.Color
                 Library:Thread(function()
                     while task.wait() do 
-                        local RainbowHue = MathAbs(MathSin(tick() * Colorpicker.CurrentAnimationSpeed))
+                        local RainbowHue = MathAbs(mathSin(tick() * Colorpicker.CurrentAnimationSpeed))
                         local Color = FromHSV(RainbowHue, 1, 1)
 
                         Colorpicker:Set(Color, Colorpicker.Alpha)
@@ -3319,7 +3319,7 @@ local Library do
                 Library:Thread(function()
                     while task.wait() do
                         local AlphaIntensity = Colorpicker.CurrentAnimationIntensity
-                        local Alpha = MathAbs(MathSin(tick() % AlphaIntensity) * Colorpicker.CurrentAnimationSpeed)
+                        local Alpha = MathAbs(mathSin(tick() % AlphaIntensity) * Colorpicker.CurrentAnimationSpeed)
 
                         Colorpicker:Set(Colorpicker.Color, Alpha)
 
@@ -3506,7 +3506,7 @@ local Library do
                 Color = FromRGB(68, 68, 68),
                 LineJoinMode = Enum.LineJoinMode.Miter,
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            }):AddToTheme({Color = "Outline"})
+            }):AddToTheme({Color = "Border"})
 
             Items["KeybindWindow"]["Outline"].Instance.Visible = false 
             Items["KeybindWindow"]["Outline"].Instance.AnchorPoint = Vector2New(1, 0)
@@ -3663,7 +3663,7 @@ local Library do
                 end
 
                 local KeyString = Keys[Keybind.Key] or StringGSub(tostring(RealKey), "Enum.", "") or RealKey
-                local TextToDisplay = KeyString and StringGSub(StringGSub(KeyString, "KeyCode.", ""), "UserInputType.", "") or "None"
+                local TextToDisplay = KeyString and StringGSub(StringGSub(KeyString, "KeyCode.", ""), "UserInputType.", "") or RealKey
 
                 TextToDisplay = StringGSub(StringGSub(KeyString, "KeyCode.", ""), "UserInputType.", "")
 
@@ -4241,7 +4241,7 @@ local Library do
                 Items["Text"].Instance.TextColor3 = FromRGB(255, 255, 255)
 
                 Library:Connect(RunService.Heartbeat, function()
-                    local GradientOffset = MathAbs(MathSin(tick() * Window.GradientTitle.Speed))
+                    local GradientOffset = MathAbs(mathSin(tick() * Window.GradientTitle.Speed))
                     UIGradient.Instance.Offset = Vector2New(GradientOffset, 0)   
                 end)
             else
