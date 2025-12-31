@@ -4983,7 +4983,7 @@ local Library do
         })
 
         function Button:SetVisibility(Bool)
-            Button:SetVisibility(Bool)
+            NewButton:SetVisibility(Bool)
         end
 
         function Button:SubButton(Data)
@@ -5325,3 +5325,4 @@ end
 
 getgenv().Library = Library
 return Library
+-- Button:SetVisibility(Bool)
